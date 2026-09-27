@@ -97,16 +97,3 @@ export type Message = {
 };
 
 export const CATEGORIES = ['Waiter', 'Kitchen', 'Bartender', 'Cleaner', 'Mover', 'Warehouse', 'Events', 'Retail'] as const;
-
-export const BOOKING_LABELS: Record<BookingStatus, string> = {
-  pending_payment: 'Processing',
-  claimed: 'Booked',
-  checked_in: 'Checked in',
-  checked_out: 'Waiting for hours confirmation',
-  confirmed: 'Hours confirmed, payment on the way',
-  paid: 'Paid',
-  no_show: 'No-show',
-  cancelled_by_worker: 'Cancelled by worker',
-  cancelled_by_employer: 'Cancelled by employer',
-  disputed: 'In dispute',
-};

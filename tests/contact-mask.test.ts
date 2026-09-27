@@ -64,3 +64,28 @@ test('leaves normal shift chat alone', () => {
     assert.equal(r.text, msg);
   }
 });
+
+test('masks numbers spelled out in Georgian and Russian', () => {
+  const ka = hidden('ჩაიწერე: ხუთი ხუთი ცხრა ერთი ორი სამი ოთხი ხუთი ექვსი');
+  assert.ok(ka.reasons.includes('phone'), JSON.stringify(ka));
+  assert.ok(hidden('пять пять девять один два три четыре').reasons.includes('phone'));
+  assert.ok(hidden('599 თორმეტი ოცი 45').reasons.includes('phone'));
+});
+
+test('masks Georgian and Russian messenger names with suffixes', () => {
+  for (const msg of ['მომწერე ვოცაპში', 'ვაიბერზე დამიკავშირდი', 'დამირეკე ხვალ', 'ჩემი ნომერია', 'напиши в ватсап', 'телеграме']) {
+    assert.ok(hidden(msg).reasons.includes('off_app_keyword'), msg);
+  }
+});
+
+test('leaves normal Georgian shift chat alone', () => {
+  for (const msg of [
+    'ათ საათზე მოვალ, შესასვლელთან დაგელოდებით',
+    'ინსტრუქცია მივიღე, შავი ფეხსაცმელი მოვიტან',
+    'სამი საათის შემდეგ შესვენება გვაქვს',
+    'მაგიდა ნომერი 12, მეორე სართული',
+  ]) {
+    const r = hidden(msg);
+    assert.equal(r.masked, false, `${msg} -> ${JSON.stringify(r)}`);
+  }
+});

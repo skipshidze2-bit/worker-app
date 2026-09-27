@@ -15,7 +15,8 @@ It follows the plan in the project's strategy notes: **employers pay a markup pe
 | Worker payouts | Workers add their Georgian IBAN. Once hours are confirmed, the booking joins the admin payout list; the admin sends a bank transfer (or shares the list for a bulk upload) and marks it sent. | `src/app/payments.tsx`, `src/app/admin.tsx`, `admin_mark_paid()` |
 | Check-in / out | GPS check-in within 300 m of the site, from 30 min before the start. | `src/app/booking/[id].tsx`, `check_in()` in the migration |
 | Hours & ratings | Employer confirms or adjusts hours; auto-confirmed after 24h. Both sides rate each other. | `confirm_hours()`, `auto_confirm_hours()`, `rate_booking()` |
-| Masked chat | Phone numbers (including spelled-out ones), emails, links, @handles and "WhatsApp/Telegram/call me" are hidden server-side and logged. | `supabase/functions/_shared/contact-mask.ts`, `send-message` |
+| Language | Georgian by default, English if the phone is set to English; switch in the profile. All text is in `src/lib/i18n.tsx` (the Georgian wording should get a native speaker's review). The admin screen is English only. | `src/lib/i18n.tsx` |
+| Masked chat | Phone numbers (including ones spelled out in English, Georgian or Russian), emails, links, @handles and messenger names like WhatsApp/ვოცაპი/Viber are hidden server-side and logged. | `supabase/functions/_shared/contact-mask.ts`, `send-message` |
 | No-shows | 15 min after the start without check-in: employer refunded, shift reopened as urgent, worker gets a strike. 3 strikes suspend. | `mark_no_shows()`, `shift-cron` |
 | Cancellations | Employer cancelling within 24h pays the worker 50% of the wage. Worker cancelling within 24h gets a strike. | `supabase/functions/cancel-booking` |
 | Favorites & rebook | Favorite workers see new shifts first and cost 12% instead of 25%. | `src/app/(employer)/workers.tsx` |

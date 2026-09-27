@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform } from 'react-native';
 
+import { useT } from '@/lib/i18n';
 import { Button, ErrorText, Field, Screen, T } from '@/components/ui';
 import { supabase } from '@/lib/supabase';
 
 export default function SignIn() {
+  const { t } = useT();
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
   const [sent, setSent] = useState(false);
@@ -35,34 +37,34 @@ export default function SignIn() {
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <Screen>
         <T variant="title" style={{ marginTop: 80 }}>
-          Day shifts, paid next day
+          {t('signIn.title')}
         </T>
-        <T muted>Find one-day work nearby, or staff your business by tomorrow.</T>
+        <T muted>{t('signIn.subtitle')}</T>
         {!sent ? (
           <>
             <Field
-              label="Phone number"
-              placeholder="+1 555 555 0100"
+              label={t('signIn.phone')}
+              placeholder="+995 5XX XX XX XX"
               keyboardType="phone-pad"
               autoComplete="tel"
               value={phone}
               onChangeText={setPhone}
             />
-            <Button title="Send code" onPress={sendCode} loading={busy} disabled={normalized.length < 8} />
+            <Button title={t('signIn.sendCode')} onPress={sendCode} loading={busy} disabled={normalized.length < 8} />
           </>
         ) : (
           <>
-            <T>We sent a code to {normalized}.</T>
+            <T>{t('signIn.codeSent', { phone: normalized })}</T>
             <Field
-              label="Code"
+              label={t('signIn.code')}
               placeholder="123456"
               keyboardType="number-pad"
               autoComplete="one-time-code"
               value={code}
               onChangeText={setCode}
             />
-            <Button title="Continue" onPress={verify} loading={busy} disabled={code.trim().length < 4} />
-            <Button title="Use a different number" variant="secondary" onPress={() => setSent(false)} />
+            <Button title={t('signIn.continue')} onPress={verify} loading={busy} disabled={code.trim().length < 4} />
+            <Button title={t('signIn.otherNumber')} variant="secondary" onPress={() => setSent(false)} />
           </>
         )}
         <ErrorText error={error} />

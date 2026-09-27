@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { Pressable, Text } from 'react-native';
 
+import { useT } from '@/lib/i18n';
 import { Button, Card, ErrorText, Field, Row, T } from '@/components/ui';
 import { useTheme } from '@/hooks/use-theme';
 import { rpc } from '@/lib/supabase';
 
 export function RateCard({ bookingId, who, onDone }: { bookingId: string; who: string; onDone: () => void }) {
+  const { t } = useT();
   const theme = useTheme();
   const [stars, setStars] = useState(0);
   const [comment, setComment] = useState('');
@@ -26,7 +28,7 @@ export function RateCard({ bookingId, who, onDone }: { bookingId: string; who: s
 
   return (
     <Card>
-      <T variant="heading">Rate {who}</T>
+      <T variant="heading">{t('rate.title', { name: who })}</T>
       <Row>
         {[1, 2, 3, 4, 5].map((n) => (
           <Pressable key={n} onPress={() => setStars(n)} accessibilityLabel={`${n} stars`}>
@@ -34,8 +36,8 @@ export function RateCard({ bookingId, who, onDone }: { bookingId: string; who: s
           </Pressable>
         ))}
       </Row>
-      <Field label="Comment (optional)" value={comment} onChangeText={setComment} />
-      <Button title="Submit rating" onPress={submit} disabled={!stars} loading={busy} />
+      <Field label={t('rate.comment')} value={comment} onChangeText={setComment} />
+      <Button title={t('rate.submit')} onPress={submit} disabled={!stars} loading={busy} />
       <ErrorText error={error} />
     </Card>
   );

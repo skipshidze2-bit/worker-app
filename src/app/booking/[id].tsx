@@ -3,16 +3,18 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Linking, Platform } from 'react-native';
 
+import { useT } from '@/lib/i18n';
 import { RateCard } from '@/components/rate';
 import { Badge, Button, Card, ErrorText, Loading, Row, Screen, T } from '@/components/ui';
 import { confirm } from '@/lib/confirm';
 import { formatMoney, formatShiftTime, formatTime, hoursBetween } from '@/lib/format';
 import { useSession } from '@/lib/session';
 import { callFunction, rpc, supabase } from '@/lib/supabase';
-import { BOOKING_LABELS, type Booking, type ShiftLocation } from '@/lib/types';
+import type { Booking, ShiftLocation } from '@/lib/types';
 import { unwrap, useQuery } from '@/lib/use-query';
 
 export default function BookingScreen() {
+  const { t } = useT();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { profile } = useSession();
   const [busy, setBusy] = useState(false);
@@ -50,13 +52,13 @@ export default function BookingScreen() {
   const checkIn = () =>
     act(async () => {
       const { granted } = await Location.requestForegroundPermissionsAsync();
-      if (!granted) throw new Error('Location is needed to check in at the job site.');
+      if (!granted) throw new Error(t('book.locationNeeded'));
       const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
       await rpc('check_in', { p_booking_id: booking.id, p_lat: pos.coords.latitude, p_lng: pos.coords.longitude });
     });
 
   const checkOut = async () => {
-    if (await confirm('Check out?', 'Your hours are counted until now.')) {
+    if (await confirm(t('book.checkOutTitle'), t('book.checkOutBody'))) {
       act(() => rpc('check_out', { p_booking_id: booking.id }));
     }
   };
@@ -64,10 +66,8 @@ export default function BookingScreen() {
   const cancel = async () => {
     const late = hoursBetween(new Date().toISOString(), shift.starts_at) < 24;
     const ok = await confirm(
-      'Cancel this shift?',
-      late
-        ? 'The shift starts within 24 hours, so cancelling now gives you a strike. 3 strikes suspend your account.'
-        : 'You can cancel for free because the shift is more than 24 hours away.',
+      t('book.cancelTitle'),
+      late ? t('book.cancelLate') : t('book.cancelEarly'),
     );
     if (ok) {
       await act(() => callFunction('cancel-booking', { booking_id: booking.id }));
@@ -90,7 +90,7 @@ export default function BookingScreen() {
       <T variant="title">{shift.role_title}</T>
       <T muted>{formatShiftTime(shift.starts_at, shift.ends_at)}</T>
       <Row>
-        <Badge text={BOOKING_LABELS[booking.status]} tone={booking.status === 'paid' ? 'success' : 'tint'} />
+        <Badge text={t(`status.${booking.status}`)} tone={booking.status === 'paid' ? 'success' : 'tint'} />
         <Badge text={`${formatMoney(booking.payout_cents ?? booking.wage_cents ?? 0, currency)}`} tone="success" />
       </Row>
 
@@ -100,7 +100,7 @@ export default function BookingScreen() {
           <>
             <T>{location.address}</T>
             {location.instructions ? <T muted>{location.instructions}</T> : null}
-            <Button title="Open in maps" variant="secondary" onPress={openMaps} />
+            <Button title={t('book.openMaps')} variant="secondary" onPress={openMaps} />
           </>
         ) : (
           <T muted>{shift.area}</T>
@@ -109,29 +109,28 @@ export default function BookingScreen() {
 
       {booking.status === 'claimed' ? (
         <Card>
-          <T variant="heading">When you arrive</T>
-          <T muted>Check in at the job site. It opens 30 minutes before the start and uses your location.</T>
-          <Button title="Check in" onPress={checkIn} loading={busy} />
+          <T variant="heading">{t('book.arrive')}</T>
+          <T muted>{t('book.arriveSub')}</T>
+          <Button title={t('book.checkIn')} onPress={checkIn} loading={busy} />
         </Card>
       ) : null}
       {booking.status === 'checked_in' ? (
         <Card>
-          <T>Checked in at {formatTime(booking.check_in_at!)}.</T>
-          <Button title="Check out" onPress={checkOut} loading={busy} />
+          <T>{t('book.checkedInAt', { time: formatTime(booking.check_in_at!) })}</T>
+          <Button title={t('book.checkOut')} onPress={checkOut} loading={busy} />
         </Card>
       ) : null}
       {booking.status === 'checked_out' ? (
         <T muted>
-          Checked out at {formatTime(booking.check_out_at!)}. The employer has 24 hours to confirm your hours, then they&apos;re
-          confirmed automatically and you&apos;re paid.
+          {t('book.checkedOut', { time: formatTime(booking.check_out_at!) })}
         </T>
       ) : null}
 
-      {chatOpen ? <Button title="Message the employer" variant="secondary" onPress={() => router.push(`/chat/${booking.id}`)} /> : null}
+      {chatOpen ? <Button title={t('book.message')} variant="secondary" onPress={() => router.push(`/chat/${booking.id}`)} /> : null}
       {['checked_out', 'confirmed', 'paid'].includes(booking.status) && !rated ? (
-        <RateCard bookingId={booking.id} who={shift.businesses?.name ?? 'the employer'} onDone={reload} />
+        <RateCard bookingId={booking.id} who={shift.businesses?.name ?? t('book.theEmployer')} onDone={reload} />
       ) : null}
-      {booking.status === 'claimed' ? <Button title="Cancel shift" variant="danger" onPress={cancel} disabled={busy} /> : null}
+      {booking.status === 'claimed' ? <Button title={t('book.cancel')} variant="danger" onPress={cancel} disabled={busy} /> : null}
       <ErrorText error={error} />
     </Screen>
   );

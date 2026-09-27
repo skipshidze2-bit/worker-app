@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n';
 import { Card, Empty, ErrorText, Row, Screen, T } from '@/components/ui';
 import { formatDay, formatMoney } from '@/lib/format';
 import { useSession } from '@/lib/session';
@@ -6,6 +7,7 @@ import type { Booking } from '@/lib/types';
 import { unwrap, useQuery } from '@/lib/use-query';
 
 export default function Earnings() {
+  const { t } = useT();
   const { profile } = useSession();
   const { data, error, loading, reload } = useQuery(
     async () =>
@@ -31,20 +33,19 @@ export default function Earnings() {
       <Row>
         <Card style={{ flex: 1 }}>
           <T variant="label" muted>
-            Paid out
+            {t('earn.paidOut')}
           </T>
           <T variant="title">{formatMoney(sum(paid), currency)}</T>
         </Card>
         <Card style={{ flex: 1 }}>
           <T variant="label" muted>
-            On the way
+            {t('earn.onTheWay')}
           </T>
           <T variant="title">{formatMoney(sum(pending), currency)}</T>
         </Card>
       </Row>
       <T variant="small" muted>
-        Pay goes to your bank account by the next working day after the employer confirms your hours. If they don&apos;t,
-        your hours are confirmed automatically 24 hours after you check out.
+        {t('earn.explain')}
       </T>
       {rows.map((b) => (
         <Card key={b.id}>
@@ -53,12 +54,12 @@ export default function Earnings() {
             <T variant="heading">{formatMoney(b.payout_cents ?? b.wage_cents ?? 0, currency)}</T>
           </Row>
           <T muted variant="small">
-            {b.shifts ? formatDay(b.shifts.starts_at) : ''} · {b.payout_ref ? 'Paid' : 'On the way'}
-            {b.status === 'cancelled_by_employer' ? ' · late cancellation pay' : ''}
+            {b.shifts ? formatDay(b.shifts.starts_at) : ''} · {b.payout_ref ? t('earn.paid') : t('earn.onTheWay')}
+            {b.status === 'cancelled_by_employer' ? t('earn.lateCancel') : ''}
           </T>
         </Card>
       ))}
-      {data && rows.length === 0 ? <Empty text="Your earnings will show here after your first shift." /> : null}
+      {data && rows.length === 0 ? <Empty text={t('earn.empty')} /> : null}
     </Screen>
   );
 }

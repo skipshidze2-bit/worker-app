@@ -127,6 +127,8 @@ do $$ begin
   assert not no_contact_info('call me 555 123 4567');
   assert not no_contact_info('find me on WhatsApp');
   assert not no_contact_info('john@example.com');
+  assert not no_contact_info('მომწერე ვოცაპში');
+  assert no_contact_info('გამოცდილი მიმტანი, ვიცი ინგლისური');
 end $$;
 
 -- Worker payout details: only valid Georgian IBANs, and payouts_enabled follows

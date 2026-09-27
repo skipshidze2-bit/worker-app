@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
 
+import { useT, type TKey } from '@/lib/i18n';
 import { Button, Card, Empty, ErrorText, Row, Screen, T } from '@/components/ui';
 import { formatRating } from '@/lib/format';
 import { useSession } from '@/lib/session';
@@ -10,6 +11,7 @@ import { unwrap, useQuery } from '@/lib/use-query';
 type Favorite = { worker_id: string; worker: Profile };
 
 export default function FavoriteWorkers() {
+  const { t } = useT();
   const { profile } = useSession();
   const { data, error, loading, reload } = useQuery(
     async () =>
@@ -29,24 +31,24 @@ export default function FavoriteWorkers() {
   return (
     <Screen refreshing={loading} onRefresh={reload}>
       <T muted>
-        Workers you&apos;ve favorited get your new shifts first, and you pay a lower fee when they work for you again.
+        {t('fav.explain')}
       </T>
       <ErrorText error={error} />
       {data?.map((f) => (
         <Card key={f.worker_id}>
           <T variant="heading">{f.worker.full_name}</T>
           <T muted>
-            {formatRating(f.worker.rating_avg, f.worker.rating_count)} · {f.worker.shifts_completed} shifts
+            {formatRating(f.worker.rating_avg, f.worker.rating_count)} · {t('common.shifts', { count: f.worker.shifts_completed })}
           </T>
-          {f.worker.skills.length ? <T muted>{f.worker.skills.join(' · ')}</T> : null}
+          {f.worker.skills.length ? <T muted>{f.worker.skills.map((s) => t(`cat.${s}` as TKey)).join(' · ')}</T> : null}
           <Row>
-            <Button title="Remove" variant="secondary" onPress={() => remove(f.worker_id)} />
+            <Button title={t('fav.remove')} variant="secondary" onPress={() => remove(f.worker_id)} />
           </Row>
         </Card>
       ))}
-      {data && data.length === 0 ? <Empty text="Tap “Favorite” on a worker after a shift to add them here." /> : null}
+      {data && data.length === 0 ? <Empty text={t('fav.empty')} /> : null}
       {data && data.length > 0 ? (
-        <Button title="Rebook: post a shift for favorites" onPress={() => router.push({ pathname: '/post', params: { favorites: '1' } })} />
+        <Button title={t('fav.rebook')} onPress={() => router.push({ pathname: '/post', params: { favorites: '1' } })} />
       ) : null}
     </Screen>
   );

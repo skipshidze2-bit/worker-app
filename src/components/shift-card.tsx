@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n';
 import { Badge, Card, Row, T } from '@/components/ui';
 import { formatMoney, formatRating, formatShiftTime, hoursBetween } from '@/lib/format';
 import type { Shift } from '@/lib/types';
@@ -5,6 +6,7 @@ import type { Shift } from '@/lib/types';
 import { wageCents, shiftMinutes } from '@shared/pricing';
 
 export function ShiftCard({ shift, onPress, footer }: { shift: Shift; onPress?: () => void; footer?: string }) {
+  const { t } = useT();
   const hours = hoursBetween(shift.starts_at, shift.ends_at);
   return (
     <Card onPress={onPress}>
@@ -22,10 +24,13 @@ export function ShiftCard({ shift, onPress, footer }: { shift: Shift; onPress?: 
       </T>
       <Row>
         <Badge
-          text={`${hours.toFixed(1)}h · ${formatMoney(wageCents(shift.hourly_rate_cents, shiftMinutes(shift.starts_at, shift.ends_at)), shift.currency.toUpperCase())} total`}
+          text={t('common.hoursTotal', {
+            hours: hours.toFixed(1),
+            amount: formatMoney(wageCents(shift.hourly_rate_cents, shiftMinutes(shift.starts_at, shift.ends_at)), shift.currency.toUpperCase()),
+          })}
           tone="success"
         />
-        {shift.is_urgent ? <Badge text="Urgent" tone="warning" /> : null}
+        {shift.is_urgent ? <Badge text={t('common.urgent')} tone="warning" /> : null}
         {footer ? <Badge text={footer} /> : null}
       </Row>
     </Card>

@@ -30,7 +30,7 @@ create function public.no_contact_info(t text) returns boolean
 language sql immutable as $$
   select t is null or (
     t !~ '\d[\d\s().-]{5,}\d'
-    and t !~* '(@|https?://|www\.|whats\s*app|telegram|viber|insta|facebook|snapchat)'
+    and t !~* '(@|https?://|www\.|whats\s*app|telegram|viber|insta|facebook|snapchat|ვ[ოა][ცტთ]?ს?აპ|ტელეგრამ|ვაიბერ|ინსტაგრამ|ფეისბუქ|ват[сc]ап|телеграм|вайбер)'
   );
 $$;
 

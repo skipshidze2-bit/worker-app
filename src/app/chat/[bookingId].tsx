@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { FlatList, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { useT } from '@/lib/i18n';
 import { Button, ErrorText, T } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -15,6 +16,7 @@ import type { Message } from '@/lib/types';
 import { maskContactInfo } from '@shared/contact-mask';
 
 export default function Chat() {
+  const { t } = useT();
   const { bookingId } = useLocalSearchParams<{ bookingId: string }>();
   const { profile } = useSession();
   const theme = useTheme();
@@ -51,8 +53,8 @@ export default function Chat() {
     if (!body) return;
     if (maskContactInfo(body).masked) {
       const ok = await confirm(
-        'Contact details will be hidden',
-        'Phone numbers, emails and social handles are hidden in chat. Keep everything in the app: that is how pay is guaranteed and no-shows are replaced. Send anyway?',
+        t('chat.warnTitle'),
+        t('chat.warnBody'),
       );
       if (!ok) return;
     }
@@ -80,7 +82,7 @@ export default function Chat() {
           onContentSizeChange={() => list.current?.scrollToEnd({ animated: true })}
           ListHeaderComponent={
             <T variant="small" muted style={{ textAlign: 'center', marginBottom: Spacing.two }}>
-              For your safety, phone numbers and other contact details are hidden. Chat closes after the shift is paid.
+              {t('chat.safety')}
             </T>
           }
           renderItem={({ item }) => {
@@ -96,7 +98,7 @@ export default function Chat() {
                 <Text style={{ color: mine ? theme.onTint : theme.text, fontSize: 16 }}>{item.body}</Text>
                 <Text style={{ color: mine ? theme.onTint : theme.textSecondary, fontSize: 11, opacity: 0.8 }}>
                   {formatTime(item.created_at)}
-                  {item.was_masked ? ' · contact details hidden' : ''}
+                  {item.was_masked ? t('chat.hidden') : ''}
                 </Text>
               </View>
             );
@@ -106,14 +108,14 @@ export default function Chat() {
         <View style={[styles.composer, { borderColor: theme.border }]}>
           <TextInput
             style={[styles.input, { color: theme.text, backgroundColor: theme.backgroundElement }]}
-            placeholder="Message"
+            placeholder={t('chat.placeholder')}
             placeholderTextColor={theme.textSecondary}
             value={text}
             onChangeText={setText}
             multiline
           />
           <View style={{ width: 90 }}>
-            <Button title="Send" onPress={send} loading={sending} disabled={!text.trim()} />
+            <Button title={t('chat.send')} onPress={send} loading={sending} disabled={!text.trim()} />
           </View>
         </View>
       </KeyboardAvoidingView>

@@ -1,13 +1,14 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 
+import { useT, type TKey } from '@/lib/i18n';
 import { RateCard } from '@/components/rate';
 import { Badge, Button, Card, ErrorText, Field, Loading, Row, Screen, T } from '@/components/ui';
 import { confirm } from '@/lib/confirm';
 import { formatMoney, formatRating, formatShiftTime, hoursBetween } from '@/lib/format';
 import { useSession } from '@/lib/session';
 import { callFunction, rpc, supabase } from '@/lib/supabase';
-import { BOOKING_LABELS, type Booking, type Shift, type ShiftLocation } from '@/lib/types';
+import type { Booking, Shift, ShiftLocation } from '@/lib/types';
 import { unwrap, useQuery } from '@/lib/use-query';
 
 import { shiftMinutes, wageCents } from '@shared/pricing';
@@ -18,6 +19,7 @@ export default function ShiftScreen() {
 }
 
 function WorkerShift() {
+  const { t } = useT();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { profile } = useSession();
   const [busy, setBusy] = useState(false);
@@ -42,7 +44,7 @@ function WorkerShift() {
   if (!shift) {
     return (
       <Screen>
-        <T>This shift is no longer available.</T>
+        <T>{t('shift.gone')}</T>
       </Screen>
     );
   }
@@ -51,16 +53,16 @@ function WorkerShift() {
   const currency = shift.currency.toUpperCase();
   const blocked =
     profile!.suspended
-      ? 'Your account is suspended.'
+      ? t('shift.blockedSuspended')
       : profile!.id_status !== 'approved'
-        ? 'You can claim shifts once your ID is verified.'
+        ? t('shift.blockedId')
         : null;
   const activeBooking = booking && ['claimed', 'checked_in', 'checked_out', 'confirmed', 'paid'].includes(booking.status);
 
   async function claim() {
     const ok = await confirm(
-      'Claim this shift?',
-      'Cancelling less than 24 hours before the start counts as a strike. 3 strikes suspend your account.',
+      t('shift.claimTitle'),
+      t('shift.claimBody'),
     );
     if (!ok) return;
     setBusy(true);
@@ -81,17 +83,19 @@ function WorkerShift() {
       <T variant="title">{shift.role_title}</T>
       <T muted>{formatShiftTime(shift.starts_at, shift.ends_at)}</T>
       <Row>
-        {shift.is_urgent ? <Badge text="Urgent" tone="warning" /> : null}
-        <Badge text={shift.category} />
+        {shift.is_urgent ? <Badge text={t('common.urgent')} tone="warning" /> : null}
+        <Badge text={t(`cat.${shift.category}` as TKey)} />
       </Row>
       <Card>
         <T variant="label" muted>
-          You earn
+          {t('shift.youEarn')}
         </T>
         <T variant="title">{formatMoney(pay, currency)}</T>
         <T muted>
-          {formatMoney(shift.hourly_rate_cents, currency)}/h × {hoursBetween(shift.starts_at, shift.ends_at).toFixed(1)}h. Paid to your
-          bank the day after the shift. No fees for you.
+          {t('shift.payExplain', {
+            rate: formatMoney(shift.hourly_rate_cents, currency),
+            hours: hoursBetween(shift.starts_at, shift.ends_at).toFixed(1),
+          })}
         </T>
       </Card>
       <Card>
@@ -100,16 +104,16 @@ function WorkerShift() {
           {shift.area} · {shift.employer ? formatRating(shift.employer.rating_avg, shift.employer.rating_count) : ''}
         </T>
         <T variant="small" muted>
-          The exact address and instructions are shown after you book.
+          {t('shift.addressLater')}
         </T>
       </Card>
       {shift.description ? <T>{shift.description}</T> : null}
       {activeBooking ? (
-        <Button title="View your booking" onPress={() => router.replace(`/booking/${booking!.id}`)} />
+        <Button title={t('shift.viewBooking')} onPress={() => router.replace(`/booking/${booking!.id}`)} />
       ) : (
         <>
           {blocked ? <T muted>{blocked}</T> : null}
-          <Button title="Claim shift" onPress={claim} loading={busy} disabled={!!blocked || shift.status !== 'open'} />
+          <Button title={t('shift.claim')} onPress={claim} loading={busy} disabled={!!blocked || shift.status !== 'open'} />
         </>
       )}
       <ErrorText error={error} />
@@ -120,6 +124,7 @@ function WorkerShift() {
 type RosterBooking = Booking & { worker: NonNullable<Booking['worker']> };
 
 function EmployerShift() {
+  const { t } = useT();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { profile } = useSession();
   const [error, setError] = useState<string | null>(null);
@@ -162,10 +167,8 @@ function EmployerShift() {
   async function cancelBooking(b: RosterBooking) {
     const late = hoursBetween(new Date().toISOString(), shift.starts_at) < 24;
     const ok = await confirm(
-      `Cancel ${b.worker.full_name}?`,
-      late
-        ? 'The shift starts within 24 hours, so the worker will still receive half of their wage.'
-        : 'You will get a full refund.',
+      t('emp.cancelWorker', { name: b.worker.full_name }),
+      late ? t('emp.cancelLate') : t('emp.cancelEarly'),
     );
     if (ok) run(() => callFunction('cancel-booking', { booking_id: b.id }));
   }
@@ -190,41 +193,44 @@ function EmployerShift() {
         {location?.address ?? shift.area} · {formatMoney(shift.hourly_rate_cents, shift.currency.toUpperCase())}/h
       </T>
       <Row>
-        <Badge text={shift.status} tone={shift.status === 'filled' ? 'success' : 'neutral'} />
-        <Badge text={`${active.filter((b) => b.status !== 'no_show').length}/${shift.workers_needed} booked`} />
-        {shift.is_urgent ? <Badge text="Urgent" tone="warning" /> : null}
+        <Badge text={t(`shiftStatus.${shift.status}`)} tone={shift.status === 'filled' ? 'success' : 'neutral'} />
+        <Badge text={t('emp.booked', { n: active.filter((b) => b.status !== 'no_show').length, total: shift.workers_needed })} />
+        {shift.is_urgent ? <Badge text={t('common.urgent')} tone="warning" /> : null}
       </Row>
       <ErrorText error={error} />
 
       <T variant="label" muted>
-        Who&apos;s coming
+        {t('emp.whoComing')}
       </T>
-      {active.length === 0 ? <T muted>Nobody has booked yet. We&apos;ll notify you when someone does.</T> : null}
+      {active.length === 0 ? <T muted>{t('emp.nobody')}</T> : null}
       {active.map((b) => (
         <Card key={b.id}>
           <Row style={{ justifyContent: 'space-between' }}>
             <T variant="heading">{b.worker.full_name}</T>
-            <Badge text={BOOKING_LABELS[b.status]} tone={b.status === 'no_show' ? 'danger' : 'neutral'} />
+            <Badge text={t(`status.${b.status}`)} tone={b.status === 'no_show' ? 'danger' : 'neutral'} />
           </Row>
           <T muted>
-            {formatRating(b.worker.rating_avg, b.worker.rating_count)} · {b.worker.shifts_completed} shifts
-            {b.is_repeat ? ' · worked with you before' : ''}
+            {formatRating(b.worker.rating_avg, b.worker.rating_count)} ·{' '}
+            {t('common.shifts', { count: b.worker.shifts_completed })}
+            {b.is_repeat ? t('emp.workedBefore') : ''}
           </T>
           {b.wage_cents != null ? (
             <T variant="small" muted>
-              Charged {formatMoney((b.wage_cents ?? 0) + (b.fee_cents ?? 0), shift.currency.toUpperCase())} (wage{' '}
-              {formatMoney(b.wage_cents, shift.currency.toUpperCase())} + fee{' '}
-              {formatMoney(b.fee_cents ?? 0, shift.currency.toUpperCase())})
+              {t('emp.charged', {
+                total: formatMoney((b.wage_cents ?? 0) + (b.fee_cents ?? 0), shift.currency.toUpperCase()),
+                wage: formatMoney(b.wage_cents, shift.currency.toUpperCase()),
+                fee: formatMoney(b.fee_cents ?? 0, shift.currency.toUpperCase()),
+              })}
             </T>
           ) : null}
           <Row style={{ flexWrap: 'wrap' }}>
             {['claimed', 'checked_in', 'checked_out', 'confirmed'].includes(b.status) ? (
-              <Button title="Chat" variant="secondary" onPress={() => router.push(`/chat/${b.id}`)} />
+              <Button title={t('common.chat')} variant="secondary" onPress={() => router.push(`/chat/${b.id}`)} />
             ) : null}
-            {b.status === 'claimed' ? <Button title="Cancel" variant="secondary" onPress={() => cancelBooking(b)} /> : null}
+            {b.status === 'claimed' ? <Button title={t('common.cancel')} variant="secondary" onPress={() => cancelBooking(b)} /> : null}
             {['checked_out', 'confirmed', 'paid'].includes(b.status) ? (
               <Button
-                title={favorites.has(b.worker_id) ? '★ Favorite' : '☆ Favorite'}
+                title={favorites.has(b.worker_id) ? t('emp.favorited') : t('emp.favorite')}
                 variant="secondary"
                 onPress={() => toggleFavorite(b.worker_id)}
               />
@@ -241,10 +247,10 @@ function EmployerShift() {
 
       {['open', 'filled'].includes(shift.status) && !active.some((b) => b.status !== 'no_show') ? (
         <Button
-          title="Cancel this shift"
+          title={t('emp.cancelShift')}
           variant="danger"
           onPress={async () => {
-            if (await confirm('Cancel this shift?', 'It will be removed from the shift feed.')) {
+            if (await confirm(t('emp.cancelShiftTitle'), t('emp.cancelShiftBody'))) {
               run(() => rpc('cancel_shift', { p_shift_id: shift.id }));
             }
           }}
@@ -255,6 +261,7 @@ function EmployerShift() {
 }
 
 function ConfirmHours({ booking, shift, onConfirm }: { booking: Booking; shift: Shift; onConfirm: (minutes: number) => void }) {
+  const { t } = useT();
   const from = booking.check_in_at && booking.check_in_at > shift.starts_at ? booking.check_in_at : shift.starts_at;
   const to = booking.check_out_at && booking.check_out_at < shift.ends_at ? booking.check_out_at : shift.ends_at;
   const [hours, setHours] = useState(Math.max(0, hoursBetween(from, to)).toFixed(2));
@@ -262,13 +269,13 @@ function ConfirmHours({ booking, shift, onConfirm }: { booking: Booking; shift: 
   return (
     <Card style={{ padding: 0 }}>
       <Field
-        label="Hours worked"
+        label={t('emp.hoursWorked')}
         keyboardType="decimal-pad"
         value={hours}
         onChangeText={setHours}
-        hint="From check-in and check-out. If you don't confirm within 24 hours after check-out, these hours are confirmed automatically."
+        hint={t('emp.hoursHint')}
       />
-      <Button title="Confirm hours" onPress={() => onConfirm(minutes)} disabled={!(minutes >= 0)} />
+      <Button title={t('emp.confirmHours')} onPress={() => onConfirm(minutes)} disabled={!(minutes >= 0)} />
     </Card>
   );
 }

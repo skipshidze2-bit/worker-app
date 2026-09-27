@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
 
+import { useT } from '@/lib/i18n';
 import { Button, Chips, ErrorText, Field, Screen, T } from '@/components/ui';
 import { useSession } from '@/lib/session';
 import { supabase } from '@/lib/supabase';
@@ -13,6 +14,7 @@ const splitList = (s: string) =>
     .filter(Boolean);
 
 export default function EditProfile() {
+  const { t } = useT();
   const { profile, refresh } = useSession();
   const [fullName, setFullName] = useState(profile?.full_name ?? '');
   const [bio, setBio] = useState(profile?.bio ?? '');
@@ -43,19 +45,24 @@ export default function EditProfile() {
 
   return (
     <Screen>
-      <Field label="Full name" value={fullName} onChangeText={setFullName} />
-      <Field label="About you" value={bio} onChangeText={setBio} multiline hint="Don't include phone numbers or social handles." />
+      <Field label={t('edit.fullName')} value={fullName} onChangeText={setFullName} />
+      <Field label={t('edit.about')} value={bio} onChangeText={setBio} multiline hint={t('edit.aboutHint')} />
       {profile.role === 'worker' ? (
         <>
           <T variant="label" muted>
-            Skills
+            {t('edit.skills')}
           </T>
-          <Chips options={CATEGORIES} value={skills as (typeof CATEGORIES)[number][]} onChange={setSkills} />
+          <Chips
+            options={CATEGORIES}
+            value={skills as (typeof CATEGORIES)[number][]}
+            onChange={setSkills}
+            label={(c) => t(`cat.${c}`)}
+          />
         </>
       ) : null}
-      <Field label="Areas" value={areas} onChangeText={setAreas} />
-      <Field label="Languages" value={languages} onChangeText={setLanguages} />
-      <Button title="Save" onPress={save} loading={busy} />
+      <Field label={t('edit.areas')} value={areas} onChangeText={setAreas} />
+      <Field label={t('onb.languages')} value={languages} onChangeText={setLanguages} />
+      <Button title={t('common.save')} onPress={save} loading={busy} />
       <ErrorText error={error} />
     </Screen>
   );

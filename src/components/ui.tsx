@@ -16,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { translateError, useT } from '@/lib/i18n';
 
 export function Screen({
   children,
@@ -128,10 +129,12 @@ export function Chips<V extends string>({
   options,
   value,
   onChange,
+  label = (o) => o,
 }: {
   options: readonly V[];
   value: V[];
   onChange: (next: V[]) => void;
+  label?: (option: V) => string;
 }) {
   const theme = useTheme();
   return (
@@ -143,7 +146,7 @@ export function Chips<V extends string>({
             key={o}
             onPress={() => onChange(on ? value.filter((v) => v !== o) : [...value, o])}
             style={[styles.chip, { backgroundColor: on ? theme.tint : theme.backgroundSelected }]}>
-            <Text style={{ color: on ? theme.onTint : theme.text }}>{o}</Text>
+            <Text style={{ color: on ? theme.onTint : theme.text }}>{label(o)}</Text>
           </Pressable>
         );
       })}
@@ -175,8 +178,9 @@ export function Empty({ text }: { text: string }) {
 
 export function ErrorText({ error }: { error: string | null }) {
   const theme = useTheme();
+  const { lang } = useT();
   if (!error) return null;
-  return <Text style={[styles.small, { color: theme.danger }]}>{error}</Text>;
+  return <Text style={[styles.small, { color: theme.danger }]}>{translateError(lang, error)}</Text>;
 }
 
 export function Loading() {

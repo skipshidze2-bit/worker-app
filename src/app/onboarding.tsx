@@ -1,5 +1,6 @@
 import { useState } from 'react';
 
+import { useT } from '@/lib/i18n';
 import { Button, Card, Chips, ErrorText, Field, Row, Screen, T } from '@/components/ui';
 import { captureAndUpload } from '@/lib/id-upload';
 import { useSession } from '@/lib/session';
@@ -13,6 +14,7 @@ const splitList = (s: string) =>
     .filter(Boolean);
 
 export default function Onboarding() {
+  const { t } = useT();
   const { session, refresh } = useSession();
   const userId = session!.user.id;
   const [role, setRole] = useState<Exclude<Role, 'admin'> | null>(null);
@@ -79,14 +81,14 @@ export default function Onboarding() {
   if (!role) {
     return (
       <Screen>
-        <T variant="heading">How will you use the app?</T>
+        <T variant="heading">{t('onb.howUse')}</T>
         <Card onPress={() => setRole('worker')}>
-          <T variant="heading">I want to work</T>
-          <T muted>Pick up one-day shifts near you. Free, and paid the next day.</T>
+          <T variant="heading">{t('onb.work')}</T>
+          <T muted>{t('onb.workSub')}</T>
         </Card>
         <Card onPress={() => setRole('employer')}>
-          <T variant="heading">I need staff</T>
-          <T muted>Post a shift and get verified workers, with a replacement if anyone doesn&apos;t show.</T>
+          <T variant="heading">{t('onb.hire')}</T>
+          <T muted>{t('onb.hireSub')}</T>
         </Card>
       </Screen>
     );
@@ -94,35 +96,40 @@ export default function Onboarding() {
 
   return (
     <Screen>
-      <Field label="Your full name" value={fullName} onChangeText={setFullName} autoComplete="name" />
+      <Field label={t('onb.fullName')} value={fullName} onChangeText={setFullName} autoComplete="name" />
       {role === 'worker' ? (
         <>
           <T variant="label" muted>
-            What work can you do?
+            {t('onb.skills')}
           </T>
-          <Chips options={CATEGORIES} value={skills as (typeof CATEGORIES)[number][]} onChange={setSkills} />
-          <Field label="Areas you can work in" placeholder="Old Town, Vake, Saburtalo" value={areas} onChangeText={setAreas} />
-          <Field label="Languages" placeholder="English, Georgian" value={languages} onChangeText={setLanguages} />
+          <Chips
+            options={CATEGORIES}
+            value={skills as (typeof CATEGORIES)[number][]}
+            onChange={setSkills}
+            label={(c) => t(`cat.${c}`)}
+          />
+          <Field label={t('onb.areas')} placeholder={t('onb.areasPh')} value={areas} onChangeText={setAreas} />
+          <Field label={t('onb.languages')} placeholder={t('onb.languagesPh')} value={languages} onChangeText={setLanguages} />
           <Card>
-            <T variant="heading">Verify your identity</T>
-            <T muted>Employers only see verified workers. Your photos are private and only seen by our team.</T>
+            <T variant="heading">{t('onb.verify')}</T>
+            <T muted>{t('onb.verifySub')}</T>
             <Row>
-              <Button title={idPath ? 'ID photo ✓' : 'Photo of your ID'} variant="secondary" onPress={() => capture('id')} />
-              <Button title={selfiePath ? 'Selfie ✓' : 'Take a selfie'} variant="secondary" onPress={() => capture('selfie')} />
+              <Button title={idPath ? t('onb.idDone') : t('onb.idPhoto')} variant="secondary" onPress={() => capture('id')} />
+              <Button title={selfiePath ? t('onb.selfieDone') : t('onb.selfie')} variant="secondary" onPress={() => capture('selfie')} />
             </Row>
           </Card>
         </>
       ) : (
         <>
-          <Field label="Business name" value={businessName} onChangeText={setBusinessName} />
-          <Field label="Company registration number (optional)" value={legalId} onChangeText={setLegalId} />
+          <Field label={t('onb.business')} value={businessName} onChangeText={setBusinessName} />
+          <Field label={t('onb.legalId')} value={legalId} onChangeText={setLegalId} />
         </>
       )}
       <T variant="small" muted>
-        By continuing you agree to the terms, including arranging all shifts with people you meet here through the app.
+        {t('onb.terms')}
       </T>
-      <Button title="Create profile" onPress={submit} loading={busy} disabled={!ready} />
-      <Button title="Back" variant="secondary" onPress={() => setRole(null)} />
+      <Button title={t('onb.create')} onPress={submit} loading={busy} disabled={!ready} />
+      <Button title={t('common.back')} variant="secondary" onPress={() => setRole(null)} />
       <ErrorText error={error} />
     </Screen>
   );

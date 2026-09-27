@@ -3,6 +3,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Switch, View } from 'react-native';
 
+import { useT } from '@/lib/i18n';
 import { Button, Card, Chips, ErrorText, Field, Row, Screen, T } from '@/components/ui';
 import { formatMoney } from '@/lib/format';
 import { useSession } from '@/lib/session';
@@ -36,6 +37,7 @@ function parseTimes(date: string, start: string, end: string): { startsAt: Date;
 }
 
 export default function PostShift() {
+  const { t } = useT();
   const { profile, privateProfile } = useSession();
   const params = useLocalSearchParams<{ favorites?: string }>();
   const [category, setCategory] = useState<(typeof CATEGORIES)[number][]>([]);
@@ -64,7 +66,7 @@ export default function PostShift() {
 
   async function useCurrentLocation() {
     const { granted } = await Location.requestForegroundPermissionsAsync();
-    if (!granted) return setError('Location permission is needed to pin the job site.');
+    if (!granted) return setError(t('post.locationNeeded'));
     const pos = await Location.getCurrentPositionAsync({});
     setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
   }
@@ -72,7 +74,7 @@ export default function PostShift() {
   async function locate(): Promise<{ lat: number; lng: number }> {
     if (coords) return coords;
     const results = await Location.geocodeAsync(address).catch(() => []);
-    if (!results[0]) throw new Error("We couldn't find that address. Try “Use my current location” at the job site.");
+    if (!results[0]) throw new Error(t('post.addressNotFound'));
     return { lat: results[0].latitude, lng: results[0].longitude };
   }
 
@@ -121,12 +123,9 @@ export default function PostShift() {
   if (!privateProfile?.has_payment_method) {
     return (
       <Screen>
-        <T variant="heading">Add a payment card first</T>
-        <T muted>
-          You&apos;re only charged when a worker books your shift. The money is held until the shift is done, and refunded if
-          nobody shows up.
-        </T>
-        <Button title="Add a card" onPress={() => router.push('/payments')} />
+        <T variant="heading">{t('post.cardFirst')}</T>
+        <T muted>{t('post.cardFirstSub')}</T>
+        <Button title={t('post.addCard')} onPress={() => router.push('/payments')} />
       </Screen>
     );
   }
@@ -136,73 +135,79 @@ export default function PostShift() {
   return (
     <Screen>
       <T variant="label" muted>
-        Type of work
+        {t('post.type')}
       </T>
-      <Chips options={CATEGORIES} value={category} onChange={(v) => setCategory(v.slice(-1))} />
-      <Field label="Job title (optional)" placeholder="e.g. Waiter for a wedding" value={title} onChangeText={setTitle} />
-      <Field label="Date" placeholder="YYYY-MM-DD" value={date} onChangeText={setDate} />
+      <Chips
+        options={CATEGORIES}
+        value={category}
+        onChange={(v) => setCategory(v.slice(-1))}
+        label={(c) => t(`cat.${c}`)}
+      />
+      <Field label={t('post.title')} placeholder={t('post.titlePh')} value={title} onChangeText={setTitle} />
+      <Field label={t('post.date')} placeholder="YYYY-MM-DD" value={date} onChangeText={setDate} />
       <Row>
         <View style={{ flex: 1 }}>
-          <Field label="Start" placeholder="10:00" value={start} onChangeText={setStart} />
+          <Field label={t('post.start')} placeholder="10:00" value={start} onChangeText={setStart} />
         </View>
         <View style={{ flex: 1 }}>
-          <Field label="End" placeholder="18:00" value={end} onChangeText={setEnd} />
+          <Field label={t('post.end')} placeholder="18:00" value={end} onChangeText={setEnd} />
         </View>
       </Row>
       <Row>
         <View style={{ flex: 1 }}>
-          <Field label="Workers needed" keyboardType="number-pad" value={workers} onChangeText={setWorkers} />
+          <Field label={t('post.workers')} keyboardType="number-pad" value={workers} onChangeText={setWorkers} />
         </View>
         <View style={{ flex: 1 }}>
-          <Field label="Pay per hour" keyboardType="decimal-pad" value={rate} onChangeText={setRate} />
+          <Field label={t('post.rate')} keyboardType="decimal-pad" value={rate} onChangeText={setRate} />
         </View>
       </Row>
-      <Field label="Area (shown publicly)" placeholder="e.g. Old Town" value={area} onChangeText={setArea} />
+      <Field label={t('post.area')} placeholder={t('post.areaPh')} value={area} onChangeText={setArea} />
       <Field
-        label="Exact address"
-        placeholder="Street, number, city"
+        label={t('post.address')}
+        placeholder={t('post.addressPh')}
         value={address}
         onChangeText={(v) => {
           setAddress(v);
           setCoords(null);
         }}
-        hint="Only shown to workers after they book."
+        hint={t('post.addressHint')}
       />
-      <Button title={coords ? 'Job site pinned ✓' : 'Use my current location'} variant="secondary" onPress={useCurrentLocation} />
-      <Field label="What the job involves" value={description} onChangeText={setDescription} multiline />
+      <Button title={coords ? t('post.pinned') : t('post.useLocation')} variant="secondary" onPress={useCurrentLocation} />
+      <Field label={t('post.description')} value={description} onChangeText={setDescription} multiline />
       <Field
-        label="Instructions for booked workers"
-        placeholder="Dress code, who to ask for, entrance"
+        label={t('post.instructions')}
+        placeholder={t('post.instructionsPh')}
         value={instructions}
         onChangeText={setInstructions}
         multiline
       />
       <Row style={{ justifyContent: 'space-between' }}>
-        <T style={{ flex: 1 }}>Offer to my favorite workers first ({FAVORITES_HEAD_START_HOURS}h head start)</T>
+        <T style={{ flex: 1 }}>{t('post.favoritesFirst', { hours: FAVORITES_HEAD_START_HOURS })}</T>
         <Switch value={favoritesFirst} onValueChange={setFavoritesFirst} />
       </Row>
 
       {quote ? (
         <Card>
           <T variant="label" muted>
-            Total price
+            {t('post.total')}
           </T>
           <T variant="title">{formatMoney(quote.totalCents)}</T>
           <T muted>
-            Wages {formatMoney(quote.wageCents)} + service fee {formatMoney(quote.feeCents)} ({quote.feeBps / 100}%)
+            {t('post.breakdown', {
+              wage: formatMoney(quote.wageCents),
+              fee: formatMoney(quote.feeCents),
+              pct: quote.feeBps / 100,
+            })}
           </T>
           <T variant="small" muted>
-            Repeat workers and favorites cost {FEES.repeatBookingBps / 100}% instead of {FEES.firstBookingBps / 100}%, so the
-            final price may be lower.{' '}
-            {quote.feeBps > FEES.firstBookingBps
-              ? `Includes a ${FEES.urgentSurchargeBps / 100}% urgent-fill surcharge for shifts starting within 24 hours.`
-              : ''}
+            {t('post.repeatNote', { repeat: FEES.repeatBookingBps / 100, first: FEES.firstBookingBps / 100 })}{' '}
+            {quote.feeBps > FEES.firstBookingBps ? t('post.urgentNote', { pct: FEES.urgentSurchargeBps / 100 }) : ''}
           </T>
         </Card>
       ) : (
-        <T muted>Enter the date, times and pay to see the price.</T>
+        <T muted>{t('post.enterDetails')}</T>
       )}
-      <Button title="Post shift" onPress={submit} loading={busy} disabled={!ready} />
+      <Button title={t('post.submit')} onPress={submit} loading={busy} disabled={!ready} />
       <ErrorText error={error} />
     </Screen>
   );
