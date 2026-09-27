@@ -1,0 +1,22 @@
+# Local development settings for the Supabase CLI (`npx supabase start`).
+# Unlisted settings use the CLI defaults.
+project_id = "worker-app"
+
+[auth]
+site_url = "workerapp://"
+
+[auth.sms]
+enable_signup = true
+enable_confirmations = true
+
+# Local testing without an SMS provider: sign in with these numbers and codes.
+[auth.sms.test_otp]
+15555550100 = "123456"
+15555550101 = "123456"
+15555550102 = "123456"
+
+[functions.stripe-webhook]
+verify_jwt = false
+
+[functions.shift-cron]
+verify_jwt = false

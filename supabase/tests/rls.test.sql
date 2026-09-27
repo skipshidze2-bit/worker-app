@@ -121,4 +121,12 @@ do $$ begin
   assert (select status = 'open' and is_urgent from shifts where id = 'aaaaaaaa-0000-0000-0000-000000000001'), 'shift reopened as urgent';
 end $$;
 
+-- Bios and descriptions can't carry contact details
+do $$ begin
+  assert no_contact_info('Experienced waiter, 5 years, speak 3 languages');
+  assert not no_contact_info('call me 555 123 4567');
+  assert not no_contact_info('find me on WhatsApp');
+  assert not no_contact_info('john@example.com');
+end $$;
+
 \echo ALL RLS TESTS PASSED

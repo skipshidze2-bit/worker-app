@@ -8,6 +8,9 @@
       ],
       "@/assets/*": [
         "./assets/*"
+      ],
+      "@shared/*": [
+        "./supabase/functions/_shared/*"
       ]
     }
   },
@@ -16,5 +19,11 @@
     "**/*.tsx",
     ".expo/types/**/*.ts",
     "expo-env.d.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "supabase/functions/*/index.ts",
+    "supabase/functions/_shared/server.ts",
+    "tests"
   ]
 }

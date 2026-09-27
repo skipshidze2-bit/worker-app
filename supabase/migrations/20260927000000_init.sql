@@ -24,6 +24,16 @@ create type public.booking_status as enum (
   'disputed'
 );
 
+-- Free text shown to the other side (bios, shift descriptions) can't carry
+-- contact details. Chat is masked more thoroughly by the send-message function.
+create function public.no_contact_info(t text) returns boolean
+language sql immutable as $$
+  select t is null or (
+    t !~ '\d[\d\s().-]{5,}\d'
+    and t !~* '(@|https?://|www\.|whats\s*app|telegram|viber|insta|facebook|snapchat)'
+  );
+$$;
+
 -- ---------------------------------------------------------------------------
 -- Profiles
 -- ---------------------------------------------------------------------------
@@ -33,7 +43,9 @@ create table public.profiles (
   role public.user_role not null,
   full_name text not null check (length(full_name) between 1 and 80),
   photo_url text,
-  bio text check (length(bio) <= 500),
+  -- Free text is shown to the other side, so it can't carry contact details.
+  -- (Chat is masked more thoroughly by the send-message function.)
+  bio text check (length(bio) <= 500 and public.no_contact_info(bio)),
   skills text[] not null default '{}',
   languages text[] not null default '{}',
   areas text[] not null default '{}',
@@ -79,7 +91,7 @@ create table public.shifts (
   business_id uuid not null references public.businesses on delete cascade,
   role_title text not null check (length(role_title) between 1 and 80),
   category text not null,
-  description text check (length(description) <= 2000),
+  description text check (length(description) <= 2000 and public.no_contact_info(description)),
   starts_at timestamptz not null,
   ends_at timestamptz not null,
   workers_needed int not null check (workers_needed between 1 and 50),
@@ -125,6 +137,8 @@ create table public.bookings (
   confirmed_minutes int,
   confirmed_at timestamptz,
   cancelled_at timestamptz,
+  reminded_day_before boolean not null default false,
+  reminded_two_hours boolean not null default false,
   created_at timestamptz not null default now(),
   unique (shift_id, worker_id)
 );
@@ -581,6 +595,29 @@ begin
 end;
 $$;
 
+-- Employer withdraws a shift. Booked workers must be cancelled first (through
+-- the cancel-booking function, which handles refunds and late-cancellation pay).
+create function public.cancel_shift(p_shift_id uuid) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if exists (
+    select 1 from bookings where shift_id = p_shift_id
+      and status in ('pending_payment', 'claimed', 'checked_in', 'checked_out', 'confirmed')
+  ) then
+    raise exception 'cancel the booked workers first';
+  end if;
+  update shifts set status = 'cancelled'
+    where id = p_shift_id and employer_id = auth.uid() and status in ('open', 'filled');
+  if not found then raise exception 'shift not found'; end if;
+end;
+$$;
+
+-- Service-role only: called when a booking is paid out.
+create function public.increment_shifts_completed(p_worker_id uuid) returns void
+language sql security definer set search_path = public as $$
+  update profiles set shifts_completed = shifts_completed + 1 where id = p_worker_id;
+$$;
+
 -- Service-role functions must not be callable from the app.
 revoke execute on function public.reserve_shift(uuid, uuid) from public, anon, authenticated;
 revoke execute on function public.auto_confirm_hours() from public, anon, authenticated;
@@ -588,6 +625,7 @@ revoke execute on function public.add_strike(uuid, uuid, text) from public, anon
 revoke execute on function public.mark_no_shows() from public, anon, authenticated;
 revoke execute on function public.complete_finished_shifts() from public, anon, authenticated;
 revoke execute on function public.sync_shift_status(uuid) from public, anon, authenticated;
+revoke execute on function public.increment_shifts_completed(uuid) from public, anon, authenticated;
 
 -- Realtime chat
 alter publication supabase_realtime add table public.messages;
