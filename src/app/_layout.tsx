@@ -1,7 +1,6 @@
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import { useColorScheme } from 'react-native';
 
-import { PaymentsProvider } from '@/lib/payments';
 import { usePushRegistration } from '@/lib/push';
 import { SessionProvider, useSession } from '@/lib/session';
 
@@ -10,9 +9,7 @@ export default function RootLayout() {
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <SessionProvider>
-        <PaymentsProvider>
-          <RootStack />
-        </PaymentsProvider>
+        <RootStack />
       </SessionProvider>
     </ThemeProvider>
   );

@@ -15,7 +15,7 @@ enable_confirmations = true
 15555550101 = "123456"
 15555550102 = "123456"
 
-[functions.stripe-webhook]
+[functions.payze-webhook]
 verify_jwt = false
 
 [functions.shift-cron]

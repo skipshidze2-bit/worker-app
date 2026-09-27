@@ -1,7 +1,8 @@
 // Worker claims a shift: reserve the slot, charge the employer's saved card into
-// escrow (held on the platform until payout), then confirm the booking.
+// escrow (held on the platform until the worker is paid), then confirm the booking.
 import { quoteBooking, shiftMinutes } from '../_shared/pricing.ts';
-import { admin, handler, hoursUntil, HttpError, json, notify, requireUser, stripe } from '../_shared/server.ts';
+import { chargeSavedCard, PAID_STATUSES } from '../_shared/payze.ts';
+import { admin, handler, hoursUntil, HttpError, json, notify, requireUser } from '../_shared/server.ts';
 
 Deno.serve(
   handler(async (req) => {
@@ -23,32 +24,26 @@ Deno.serve(
 
     const { data: employer } = await admin
       .from('private_profiles')
-      .select('stripe_customer_id')
+      .select('card_token')
       .eq('id', shift.employer_id)
       .single();
 
     try {
-      if (!employer?.stripe_customer_id) throw new Error('employer has no card on file');
-      const methods = await stripe.paymentMethods.list({ customer: employer.stripe_customer_id, type: 'card', limit: 1 });
-      if (!methods.data[0]) throw new Error('employer has no card on file');
-      const pi = await stripe.paymentIntents.create({
-        amount: quote.totalCents,
+      if (!employer?.card_token) throw new Error('employer has no card on file');
+      const charge = await chargeSavedCard({
+        token: employer.card_token,
+        amountCents: quote.totalCents,
         currency: shift.currency,
-        customer: employer.stripe_customer_id,
-        payment_method: methods.data[0].id,
-        off_session: true,
-        confirm: true,
-        transfer_group: booking_id,
+        bookingId: booking_id,
         description: `${shift.role_title} shift ${shift.starts_at}`,
-        metadata: { booking_id, shift_id, wage_cents: String(quote.wageCents), fee_cents: String(quote.feeCents) },
       });
-      if (pi.status !== 'succeeded') throw new Error(`payment ${pi.status}`);
+      if (!PAID_STATUSES.has(charge.status)) throw new Error(`payment ${charge.status}`);
 
       await admin
         .from('bookings')
         .update({
           status: 'claimed',
-          payment_intent_id: pi.id,
+          payment_id: charge.paymentId,
           wage_cents: quote.wageCents,
           fee_cents: quote.feeCents,
           fee_bps: quote.feeBps,

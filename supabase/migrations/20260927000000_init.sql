@@ -64,10 +64,13 @@ create table public.private_profiles (
   phone text,
   id_document_path text,
   selfie_path text,
-  stripe_customer_id text,       -- employers
+  -- Employers: saved card at the payment provider (Payze). Set by the payment webhook.
+  card_token text,
+  card_mask text,
   has_payment_method boolean not null default false,
-  stripe_account_id text,        -- workers (Stripe Connect Express)
-  payouts_enabled boolean not null default false,
+  -- Workers: Georgian bank account for payouts.
+  payout_iban text check (payout_iban ~ '^GE[0-9]{2}[A-Z]{2}[0-9]{16}$'),
+  payouts_enabled boolean generated always as (payout_iban is not null) stored,
   expo_push_token text
 );
 
@@ -96,7 +99,7 @@ create table public.shifts (
   ends_at timestamptz not null,
   workers_needed int not null check (workers_needed between 1 and 50),
   hourly_rate_cents int not null check (hourly_rate_cents > 0),
-  currency text not null default 'usd',
+  currency text not null default 'gel',
   area text not null,             -- public: neighbourhood / district only
   status public.shift_status not null default 'open',
   is_urgent boolean not null default false,
@@ -126,8 +129,9 @@ create table public.bookings (
   fee_bps int,
   wage_cents int,
   fee_cents int,
-  payment_intent_id text,
-  transfer_id text,
+  payment_id text,               -- provider payment id of the employer charge
+  payout_ref text,               -- bank transfer reference once the worker is paid
+  settled_at timestamptz,        -- unworked hours refunded, payout_cents final
   refund_cents int not null default 0,
   payout_cents int,
   check_in_at timestamptz,
@@ -177,6 +181,14 @@ create table public.strikes (
   worker_id uuid not null references public.profiles on delete cascade,
   booking_id uuid references public.bookings on delete set null,
   reason text not null,
+  created_at timestamptz not null default now()
+);
+
+-- Card-saving sessions started with the payment provider, so the webhook can
+-- tell whose card was saved.
+create table public.card_setups (
+  payment_id text primary key,
+  user_id uuid not null references public.profiles on delete cascade,
   created_at timestamptz not null default now()
 );
 
@@ -280,6 +292,7 @@ alter table public.ratings enable row level security;
 alter table public.favorites enable row level security;
 alter table public.strikes enable row level security;
 alter table public.bypass_flags enable row level security;
+alter table public.card_setups enable row level security;
 
 -- Column-level grants stop users from editing ratings, strikes, roles or payment state.
 revoke all on all tables in schema public from anon, authenticated;
@@ -296,8 +309,8 @@ create policy profiles_update_self on public.profiles for update to authenticate
 
 -- private_profiles: owner only
 grant select on public.private_profiles to authenticated;
-grant insert (id, phone, id_document_path, selfie_path, expo_push_token) on public.private_profiles to authenticated;
-grant update (phone, id_document_path, selfie_path, expo_push_token) on public.private_profiles to authenticated;
+grant insert (id, phone, id_document_path, selfie_path, expo_push_token, payout_iban) on public.private_profiles to authenticated;
+grant update (phone, id_document_path, selfie_path, expo_push_token, payout_iban) on public.private_profiles to authenticated;
 create policy private_self_read on public.private_profiles for select to authenticated
   using (id = auth.uid() or is_admin());
 create policy private_self_insert on public.private_profiles for insert to authenticated
@@ -432,7 +445,7 @@ begin
     values (p_shift_id, p_worker_id, 'pending_payment', v_repeat)
     on conflict (shift_id, worker_id) do update
       set status = 'pending_payment', is_repeat = excluded.is_repeat, cancelled_at = null,
-          payment_intent_id = null, transfer_id = null, refund_cents = 0, payout_cents = null
+          payment_id = null, payout_ref = null, settled_at = null, refund_cents = 0, payout_cents = null
       where bookings.status in ('cancelled_by_worker', 'cancelled_by_employer')
     returning id into v_booking;
   if v_booking is null then raise exception 'you already claimed this shift'; end if;
@@ -537,14 +550,14 @@ $$;
 -- Service-role only: bookings 15 minutes past start with no check-in.
 -- Marks them no-show, strikes the worker, and reopens the shift as urgent.
 create function public.mark_no_shows()
-returns table (booking_id uuid, shift_id uuid, employer_id uuid, worker_id uuid, payment_intent_id text,
+returns table (booking_id uuid, shift_id uuid, employer_id uuid, worker_id uuid, payment_id text,
                wage_cents int, fee_cents int)
 language plpgsql security definer set search_path = public as $$
 declare
   r record;
 begin
   for r in
-    select b.id, b.shift_id, s.employer_id, b.worker_id, b.payment_intent_id, b.wage_cents, b.fee_cents
+    select b.id, b.shift_id, s.employer_id, b.worker_id, b.payment_id, b.wage_cents, b.fee_cents
     from bookings b join shifts s on s.id = b.shift_id
     where b.status = 'claimed' and s.starts_at < now() - interval '15 minutes' and s.ends_at > now()
     for update of b
@@ -553,7 +566,7 @@ begin
     perform add_strike(r.worker_id, r.id, 'no-show');
     update shifts set is_urgent = true where id = r.shift_id;
     booking_id := r.id; shift_id := r.shift_id; employer_id := r.employer_id; worker_id := r.worker_id;
-    payment_intent_id := r.payment_intent_id; wage_cents := r.wage_cents; fee_cents := r.fee_cents;
+    payment_id := r.payment_id; wage_cents := r.wage_cents; fee_cents := r.fee_cents;
     return next;
   end loop;
 end;
@@ -566,7 +579,7 @@ language sql security definer set search_path = public as $$
   where s.status in ('open', 'filled') and s.ends_at < now()
     and not exists (
       select 1 from bookings b where b.shift_id = s.id
-        and b.status in ('pending_payment', 'claimed', 'checked_in', 'checked_out', 'confirmed')
+        and b.status in ('pending_payment', 'claimed', 'checked_in', 'checked_out')
     );
 $$;
 
@@ -612,12 +625,6 @@ begin
 end;
 $$;
 
--- Service-role only: called when a booking is paid out.
-create function public.increment_shifts_completed(p_worker_id uuid) returns void
-language sql security definer set search_path = public as $$
-  update profiles set shifts_completed = shifts_completed + 1 where id = p_worker_id;
-$$;
-
 -- Service-role functions must not be callable from the app.
 revoke execute on function public.reserve_shift(uuid, uuid) from public, anon, authenticated;
 revoke execute on function public.auto_confirm_hours() from public, anon, authenticated;
@@ -625,7 +632,6 @@ revoke execute on function public.add_strike(uuid, uuid, text) from public, anon
 revoke execute on function public.mark_no_shows() from public, anon, authenticated;
 revoke execute on function public.complete_finished_shifts() from public, anon, authenticated;
 revoke execute on function public.sync_shift_status(uuid) from public, anon, authenticated;
-revoke execute on function public.increment_shifts_completed(uuid) from public, anon, authenticated;
 
 -- Realtime chat
 alter publication supabase_realtime add table public.messages;
@@ -639,6 +645,26 @@ language plpgsql security definer set search_path = public as $$
 begin
   if not is_admin() then raise exception 'admins only'; end if;
   update profiles set id_status = p_status where id = p_user;
+end;
+$$;
+
+-- Worker payouts are bank transfers from the company account. Admins send them
+-- from the payout list and record the transfer reference here.
+create function public.admin_mark_paid(p_booking_id uuid, p_reference text) returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  v_worker uuid;
+  v_status booking_status;
+begin
+  if not is_admin() then raise exception 'admins only'; end if;
+  update bookings set payout_ref = coalesce(nullif(p_reference, ''), 'sent'),
+                      status = case when status = 'confirmed' then 'paid'::booking_status else status end
+    where id = p_booking_id and settled_at is not null and payout_ref is null and payout_cents > 0
+    returning worker_id, status into v_worker, v_status;
+  if not found then raise exception 'nothing to pay for this booking'; end if;
+  if v_status = 'paid' then
+    update profiles set shifts_completed = shifts_completed + 1 where id = v_worker;
+  end if;
 end;
 $$;
 

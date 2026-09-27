@@ -123,6 +123,6 @@ export function settleCancellation(opts: {
   return { payoutCents: 0, keptFeeCents: 0, refundCents: total, late };
 }
 
-export function formatMoney(cents: number, currency = 'USD'): string {
-  return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(cents / 100);
+export function formatMoney(cents: number, currency = 'GEL'): string {
+  return new Intl.NumberFormat('en-GE', { style: 'currency', currency }).format(cents / 100);
 }

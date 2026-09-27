@@ -129,4 +129,35 @@ do $$ begin
   assert not no_contact_info('john@example.com');
 end $$;
 
+-- Worker payout details: only valid Georgian IBANs, and payouts_enabled follows
+set role authenticated;
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000a');
+do $$ begin
+  begin update private_profiles set payout_iban = 'not-an-iban' where id = auth.uid(); raise exception 'FAIL: bad IBAN accepted';
+  exception when check_violation then null; end;
+  begin update private_profiles set payouts_enabled = true where id = auth.uid(); raise exception 'FAIL: payouts_enabled writable';
+  exception when insufficient_privilege or generated_always then null; end;
+end $$;
+update private_profiles set payout_iban = 'GE29NB0000000101904917' where id = auth.uid();
+do $$ begin assert (select payouts_enabled from private_profiles where id = auth.uid()); end $$;
+
+-- Admin payout: settle the confirmed booking, then only an admin can mark it paid
+reset role;
+update bookings set settled_at = now(), payout_cents = 12000 where shift_id <> 'aaaaaaaa-0000-0000-0000-000000000001';
+set role authenticated;
+do $$ begin
+  begin perform admin_mark_paid((select id from bookings where status = 'confirmed'), 'x'); raise exception 'FAIL: non-admin paid';
+  exception when raise_exception then if sqlerrm like 'FAIL%' then raise; end if; end;
+end $$;
+reset role;
+update profiles set role = 'admin' where full_name = 'Worker B';
+set role authenticated;
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000b');
+select admin_mark_paid((select id from bookings where status = 'confirmed'), 'BOG-123');
+reset role;
+do $$ begin
+  assert (select status from bookings where payout_ref = 'BOG-123') = 'paid';
+  assert (select shifts_completed from profiles where full_name = 'Worker A') = 1;
+end $$;
+
 \echo ALL RLS TESTS PASSED

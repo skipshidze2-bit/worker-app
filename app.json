@@ -48,13 +48,6 @@
           "photosPermission": "Choose a photo of your ID for verification."
         }
       ],
-      [
-        "@stripe/stripe-react-native",
-        {
-          "merchantIdentifier": "merchant.com.workerapp.app",
-          "enableGooglePay": false
-        }
-      ],
       "expo-notifications"
     ],
     "experiments": {

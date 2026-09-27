@@ -24,6 +24,7 @@
     "node_modules",
     "supabase/functions/*/index.ts",
     "supabase/functions/_shared/server.ts",
+    "supabase/functions/_shared/payze.ts",
     "tests"
   ]
 }

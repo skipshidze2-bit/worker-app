@@ -1,7 +1,8 @@
 // Either side cancels a booking. Late employer cancellations still pay the
 // worker part of the wage; late worker cancellations earn a strike.
 import { settleCancellation } from '../_shared/pricing.ts';
-import { admin, handler, hoursUntil, HttpError, json, notify, payout, refund, requireUser } from '../_shared/server.ts';
+import { refund } from '../_shared/payze.ts';
+import { admin, handler, hoursUntil, HttpError, json, notify, requireUser } from '../_shared/server.ts';
 
 Deno.serve(
   handler(async (req) => {
@@ -36,23 +37,14 @@ Deno.serve(
         cancelled_at: new Date().toISOString(),
         refund_cents: s.refundCents,
         payout_cents: s.payoutCents,
+        settled_at: new Date().toISOString(), // a late-cancellation payout joins the admin payout list
       })
       .eq('id', booking_id)
       .eq('status', 'claimed')
       .select('id');
     if (!claimed?.length) throw new HttpError(409, 'booking already changed');
 
-    await refund(b.payment_intent_id, s.refundCents, booking_id);
-    if (s.payoutCents > 0) {
-      const transferId = await payout({
-        bookingId: booking_id,
-        workerId: b.worker_id,
-        cents: s.payoutCents,
-        currency: shift.currency,
-        paymentIntentId: b.payment_intent_id,
-      });
-      if (transferId) await admin.from('bookings').update({ transfer_id: transferId }).eq('id', booking_id);
-    }
+    await refund(b.payment_id, s.refundCents, booking_id);
 
     if (by === 'worker') {
       if (s.late) await admin.rpc('add_strike', { p_worker_id: b.worker_id, p_booking_id: booking_id, p_reason: 'late cancellation' });

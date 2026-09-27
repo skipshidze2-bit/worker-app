@@ -1,10 +1,5 @@
 // Helpers for edge functions (Deno). Not imported by the app.
 import { createClient, type SupabaseClient, type User } from 'npm:@supabase/supabase-js@2';
-import Stripe from 'npm:stripe@17';
-
-export const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') ?? '', {
-  httpClient: Stripe.createFetchHttpClient(),
-});
 
 /** Service-role client: bypasses RLS. Only use after checking who the caller is. */
 export const admin: SupabaseClient = createClient(
@@ -55,49 +50,6 @@ export function handler(fn: (req: Request) => Promise<Response>) {
 
 export function hoursUntil(iso: string): number {
   return (new Date(iso).getTime() - Date.now()) / 3_600_000;
-}
-
-/** Refunds part of a booking's charge. */
-export async function refund(paymentIntentId: string | null, cents: number, bookingId: string) {
-  if (!paymentIntentId || cents <= 0) return;
-  await stripe.refunds.create(
-    { payment_intent: paymentIntentId, amount: cents, metadata: { booking_id: bookingId } },
-    { idempotencyKey: `refund-${bookingId}-${cents}` },
-  );
-}
-
-/** Sends the worker's share to their Stripe Connect account. */
-export async function payout(opts: {
-  bookingId: string;
-  workerId: string;
-  cents: number;
-  currency: string;
-  paymentIntentId: string | null;
-}): Promise<string | null> {
-  if (opts.cents <= 0) return null;
-  const { data: priv } = await admin
-    .from('private_profiles')
-    .select('stripe_account_id, payouts_enabled')
-    .eq('id', opts.workerId)
-    .single();
-  if (!priv?.stripe_account_id || !priv.payouts_enabled) return null; // retried by shift-cron once set up
-  let sourceTransaction: string | undefined;
-  if (opts.paymentIntentId) {
-    const pi = await stripe.paymentIntents.retrieve(opts.paymentIntentId);
-    sourceTransaction = typeof pi.latest_charge === 'string' ? pi.latest_charge : pi.latest_charge?.id;
-  }
-  const transfer = await stripe.transfers.create(
-    {
-      amount: opts.cents,
-      currency: opts.currency,
-      destination: priv.stripe_account_id,
-      transfer_group: opts.bookingId,
-      source_transaction: sourceTransaction,
-      metadata: { booking_id: opts.bookingId },
-    },
-    { idempotencyKey: `payout-${opts.bookingId}` },
-  );
-  return transfer.id;
 }
 
 export async function notify(userId: string, title: string, body: string, data: Record<string, string> = {}) {

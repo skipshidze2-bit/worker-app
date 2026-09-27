@@ -20,10 +20,10 @@ export default function Earnings() {
   );
 
   const rows = (data ?? []).filter((b) => b.status !== 'cancelled_by_employer' || (b.payout_cents ?? 0) > 0);
-  const paid = rows.filter((b) => b.status === 'paid' || b.status === 'cancelled_by_employer');
-  const pending = rows.filter((b) => b.status === 'checked_out' || b.status === 'confirmed');
+  const paid = rows.filter((b) => b.payout_ref);
+  const pending = rows.filter((b) => !b.payout_ref);
   const sum = (list: Booking[]) => list.reduce((acc, b) => acc + (b.payout_cents ?? b.wage_cents ?? 0), 0);
-  const currency = (rows[0]?.shifts?.currency ?? 'usd').toUpperCase();
+  const currency = (rows[0]?.shifts?.currency ?? 'gel').toUpperCase();
 
   return (
     <Screen refreshing={loading} onRefresh={reload}>
@@ -43,7 +43,8 @@ export default function Earnings() {
         </Card>
       </Row>
       <T variant="small" muted>
-        Pay is sent the day after the employer confirms your hours, or automatically 24 hours after you check out.
+        Pay goes to your bank account by the next working day after the employer confirms your hours. If they don&apos;t,
+        your hours are confirmed automatically 24 hours after you check out.
       </T>
       {rows.map((b) => (
         <Card key={b.id}>
@@ -52,7 +53,8 @@ export default function Earnings() {
             <T variant="heading">{formatMoney(b.payout_cents ?? b.wage_cents ?? 0, currency)}</T>
           </Row>
           <T muted variant="small">
-            {b.shifts ? formatDay(b.shifts.starts_at) : ''} · {b.status === 'paid' ? 'Paid' : b.status === 'cancelled_by_employer' ? 'Late cancellation pay' : 'Pending'}
+            {b.shifts ? formatDay(b.shifts.starts_at) : ''} · {b.payout_ref ? 'Paid' : 'On the way'}
+            {b.status === 'cancelled_by_employer' ? ' · late cancellation pay' : ''}
           </T>
         </Card>
       ))}

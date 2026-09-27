@@ -21,7 +21,8 @@ export type PrivateProfile = {
   id: string;
   phone: string | null;
   has_payment_method: boolean;
-  stripe_account_id: string | null;
+  card_mask: string | null;
+  payout_iban: string | null;
   payouts_enabled: boolean;
 };
 
@@ -76,6 +77,8 @@ export type Booking = {
   wage_cents: number | null;
   fee_cents: number | null;
   payout_cents: number | null;
+  payout_ref: string | null;
+  settled_at: string | null;
   check_in_at: string | null;
   check_out_at: string | null;
   confirmed_minutes: number | null;
@@ -100,7 +103,7 @@ export const BOOKING_LABELS: Record<BookingStatus, string> = {
   claimed: 'Booked',
   checked_in: 'Checked in',
   checked_out: 'Waiting for hours confirmation',
-  confirmed: 'Hours confirmed, payout pending',
+  confirmed: 'Hours confirmed, payment on the way',
   paid: 'Paid',
   no_show: 'No-show',
   cancelled_by_worker: 'Cancelled by worker',
